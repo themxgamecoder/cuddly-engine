@@ -2,12 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const { default: makeWASocket, useMultiFileAuthState, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
 const pino = require('pino');
-const { Storage } = require('megajs');
+const { MongoClient } = require('mongodb');
 
 // === CONFIG ===
-const SESSION_ID = 'mekaai_abadf913';
+const SESSION_ID = 'mekaai_43cdf18f';
 const LOG_FILE = path.join(__dirname, 'logs.txt');
-const OWNER_JID = '2349117525115@s.whatsapp.net'; // Replace with actual owner JID
+const OWNER_JID = '263711346419@s.whatsapp.net'; // Replace with actual owner JID
 let repliedMap = new Map(); // Prevent duplicate replies
 
 // === LOGGING ===
@@ -30,34 +30,32 @@ function extractText(msg) {
   return null;
 }
 
-// === MEGA SESSION RESTORE ===
+// === SESSION RESTORE ===
 async function restoreSessionFromID(id) {
-  const storage = new Storage({
-    email: 'olamilekandamilaraaa@gmail.com',
-    password: 'mxgamecoder'
-  });
+  const uri = "mongodb+srv://damilaraolamilekan:damilaraolamilekan@cluster0.tglsxja.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
 
-  await new Promise((resolve, reject) => {
-    storage.login(err => err ? reject(err) : resolve());
-  });
+  const client = new MongoClient(uri);
+  await client.connect();
+  const database = client.db("mekaSessions");
+  const sessions = database.collection("sessions");
 
-  const file = storage.root.children.find(f => f.name === `${id}.json`);
-  if (!file) {
-    log("❌ Session not found for ID:", id);
+  const doc = await sessions.findOne({ _id: id });
+
+  if (!doc) {
+    log("❌ Session not found in MongoDB for ID:", id);
     process.exit(1);
   }
 
-  const stream = file.download();
-  const chunks = [];
-  for await (const chunk of stream) chunks.push(chunk);
-  const data = Buffer.concat(chunks);
+  const data = Buffer.from(doc.sessionData, 'base64'); // Convert back to buffer
 
   const sessionDir = path.join(__dirname, 'session');
   if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir);
 
   const credsPath = path.join(sessionDir, 'creds.json');
   fs.writeFileSync(credsPath, data);
-  log('✅ Session restored from MEGA with ID:', id);
+  log('✅ Session restored from 😃 with ID:', id);
+
+  await client.close();
 }
 
 // === START BOT ===
@@ -73,7 +71,9 @@ async function startBot(id) {
     browser: ['Ubuntu', 'Chrome', 'meka'],
     logger: pino({ level: 'fatal' }),
     ignoreBroadcast: true,
-    syncFullHistory: false,
+    syncFullHistory: false, // ✅ you want speed — no old msg sync
+    shouldIgnoreJid: (jid) => false, // ✅ force read from all JIDs
+    getMessage: async () => undefined // ✅ avoid fallback errors
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -115,7 +115,7 @@ async function startBot(id) {
 
           try {
             await sock.sendMessage(from, {
-              text: `hello 🤗`,
+              text: `hello 🤗😒😒😒`,
               mentions: [sender],
             });
 
