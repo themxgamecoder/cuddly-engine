@@ -5,6 +5,8 @@ const express = require('express');
 const pino = require('pino');
 const { MongoClient } = require('mongodb');
 const { default: makeWASocket, useMultiFileAuthState, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
+const app = express();
+const PORT = process.env.PORT || 3000;
 
 // === CONFIG ===
 const SESSION_ID = 'mekaai_43cdf18f';
@@ -14,14 +16,10 @@ const MONGO_URI = 'mongodb+srv://damilaraolamilekan:damilaraolamilekan@cluster0.
 const repliedMap = new Map();
 let firstBoot = true;
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-
 fs.writeFileSync(LOG_FILE, '');
 function log(...args) {
   const text = args.map(a => typeof a === 'string' ? a : JSON.stringify(a, null, 2)).join(' ');
   fs.appendFileSync(LOG_FILE, `[${new Date().toISOString()}] ${text}\n`);
-  console.log(...args);
 }
 
 function extractText(msg) {
@@ -41,12 +39,10 @@ async function restoreSessionFromID(id) {
   await client.connect();
   const db = client.db("mekaSessions");
   const doc = await db.collection("sessions").findOne({ _id: id });
-
   if (!doc) {
     log("❌ No session found in MongoDB for ID:", id);
     process.exit(1);
   }
-
   const data = Buffer.from(doc.sessionData, 'base64');
   const sessionDir = path.join(__dirname, 'session');
   if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir);
@@ -62,7 +58,7 @@ async function startBot(id) {
   const sock = makeWASocket({
     auth: {
       creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'fatal' }))
+      keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'fatal' })),
     },
     logger: pino({ level: 'fatal' }),
     browser: ['Ubuntu', 'Chrome', 'meka-bot'],
@@ -73,7 +69,7 @@ async function startBot(id) {
     enableChats: true,
     fetchChats: true,
     shouldIgnoreJid: () => false,
-    getMessage: async () => undefined,
+    getMessage: async () => undefined
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -82,7 +78,6 @@ async function startBot(id) {
     if (connection === 'open') {
       sock.sendPresenceUpdate('available');
       log('✅ Connected & online');
-      firstBoot = false;
     }
   });
 
@@ -90,10 +85,8 @@ async function startBot(id) {
     if (events['messages.upsert']) {
       const { messages, type } = events['messages.upsert'];
       if (type !== 'notify') return;
-
       for (const msg of messages) {
         if (!msg.message) continue;
-
         const from = msg.key.remoteJid;
         const isGroup = from.endsWith('@g.us');
         const sender = isGroup ? msg.key.participant : from;
@@ -104,14 +97,13 @@ async function startBot(id) {
         if (text === 'hi') {
           const replyKey = `${from}|${msg.messageTimestamp}`;
           if (repliedMap.has(replyKey)) continue;
-
           repliedMap.set(replyKey, true);
           setTimeout(() => repliedMap.delete(replyKey), 10000);
 
           try {
             await sock.sendMessage(from, {
-              text: 'hello 🤗😒😒😒',
-              mentions: [sender]
+              text: 'hello 🤗😑😑 this bot is deploy on render',
+              mentions: [sender],
             });
 
             if (sender === OWNER_JID) {
