@@ -21,7 +21,7 @@ require('dotenv').config();
  */
 
 module.exports = {
-  SESSION_ID: process.env.SESSION_ID || 'mekaai_43cdf18f',
+  SESSION_ID: process.env.SESSION_ID || 'deathnote_7dce53f4',
   OWNER_JID: process.env.OWNER_JID || '',
   MEKAMODE: process.env.MEKAMODE || 'meka',
   PORT: process.env.PORT || 3000,
