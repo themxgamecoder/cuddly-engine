@@ -72,15 +72,20 @@ async function startBot(id) {
     browser: ['Ubuntu', 'Chrome', 'meka'],
     logger: pino({ level: 'fatal' }),
     ignoreBroadcast: true,
-    syncFullHistory: false,
+    syncFullHistory: true, // 👉🏽 Enable this ONCE for fresh session
     shouldIgnoreJid: (jid) => false,
     getMessage: async () => undefined,
-
-    syncOwn: true, // 👈🏽 ADD THIS LINE 👑
+    syncOwn: true, // 🧠 See your own messages
   });
 
   sock.ev.on('creds.update', saveCreds);
-
+  sock.ev.on('message-receipt.update', (m) => {
+    if (m && m.key && m.key.remoteJid && m.key.id) {
+      sock.readMessages([m.key]);
+    } else {
+      log('⚠️ Skipped readMessages: Invalid message-receipt key', m);
+    }
+  });
   sock.ev.process(async (events) => {
     if (events['connection.update']) {
       const { connection } = events['connection.update'];
