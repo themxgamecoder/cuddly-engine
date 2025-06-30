@@ -1,27 +1,29 @@
-// === index.js ===
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
-const pino = require('pino');
 const { MongoClient } = require('mongodb');
-const { default: makeWASocket, useMultiFileAuthState, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
-const app = express();
-const PORT = process.env.PORT || 3000;
+const pino = require('pino');
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  makeCacheableSignalKeyStore,
+} = require('@whiskeysockets/baileys');
 
 // === CONFIG ===
 const SESSION_ID = 'mekaai_43cdf18f';
-const OWNER_JID = '263711346419@s.whatsapp.net';
 const LOG_FILE = path.join(__dirname, 'logs.txt');
-const MONGO_URI = 'mongodb+srv://damilaraolamilekan:damilaraolamilekan@cluster0.tglsxja.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
-const repliedMap = new Map();
-let firstBoot = true;
+const OWNER_JID = '263711346419@s.whatsapp.net';
+let repliedMap = new Map();
 
+// === LOGGING ===
 fs.writeFileSync(LOG_FILE, '');
 function log(...args) {
   const text = args.map(a => typeof a === 'string' ? a : JSON.stringify(a, null, 2)).join(' ');
   fs.appendFileSync(LOG_FILE, `[${new Date().toISOString()}] ${text}\n`);
+  console.log(...args);
 }
 
+// === EXTRACT TEXT ===
 function extractText(msg) {
   if (!msg) return null;
   if (typeof msg === 'string') return msg;
@@ -34,15 +36,20 @@ function extractText(msg) {
   return null;
 }
 
+// === RESTORE SESSION ===
 async function restoreSessionFromID(id) {
-  const client = new MongoClient(MONGO_URI);
+  const uri = "mongodb+srv://damilaraolamilekan:damilaraolamilekan@cluster0.tglsxja.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+  const client = new MongoClient(uri);
   await client.connect();
-  const db = client.db("mekaSessions");
-  const doc = await db.collection("sessions").findOne({ _id: id });
+  const database = client.db("mekaSessions");
+  const sessions = database.collection("sessions");
+  const doc = await sessions.findOne({ _id: id });
+
   if (!doc) {
-    log("❌ No session found in MongoDB for ID:", id);
+    log("❌ Session not found in MongoDB for ID:", id);
     process.exit(1);
   }
+
   const data = Buffer.from(doc.sessionData, 'base64');
   const sessionDir = path.join(__dirname, 'session');
   if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir);
@@ -51,6 +58,7 @@ async function restoreSessionFromID(id) {
   await client.close();
 }
 
+// === START BOT ===
 async function startBot(id) {
   await restoreSessionFromID(id);
   const { state, saveCreds } = await useMultiFileAuthState('./session');
@@ -58,71 +66,90 @@ async function startBot(id) {
   const sock = makeWASocket({
     auth: {
       creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'fatal' })),
+      keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
     },
-    logger: pino({ level: 'fatal' }),
-    browser: ['Ubuntu', 'Chrome', 'meka-bot'],
-    ignoreBroadcast: false,
-    syncOwn: true,
-    syncFullHistory: firstBoot,
-    emitOwnOnline: true,
-    enableChats: true,
-    fetchChats: true,
+    browser: ['Ubuntu', 'Chrome', 'meka'],
+    logger: pino({ level: 'silent' }),
+    syncFullHistory: false,
     shouldIgnoreJid: () => false,
-    getMessage: async () => undefined
+    getMessage: async () => undefined,
+    emitOwnEvents: true,
+    markOnlineOnConnect: true,
   });
 
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', ({ connection }) => {
-    if (connection === 'open') {
-      sock.sendPresenceUpdate('available');
-      log('✅ Connected & online');
-    }
+    log('🔌 Connection update:', connection);
+    if (connection === 'open') log('✅ Connected & online');
   });
 
-  sock.ev.process(async events => {
-    if (events['messages.upsert']) {
-      const { messages, type } = events['messages.upsert'];
-      if (type !== 'notify') return;
-      for (const msg of messages) {
-        if (!msg.message) continue;
-        const from = msg.key.remoteJid;
-        const isGroup = from.endsWith('@g.us');
-        const sender = isGroup ? msg.key.participant : from;
-        const text = extractText(msg.message)?.trim().toLowerCase();
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
 
-        log(`📨 ${from} | ${text} | isGroup: ${isGroup}`);
+    for (const msg of messages) {
+      if (!msg.message) {
+        log("⚠️ Empty or system message");
+        continue;
+      }
 
-        if (text === 'hi') {
-          const replyKey = `${from}|${msg.messageTimestamp}`;
-          if (repliedMap.has(replyKey)) continue;
-          repliedMap.set(replyKey, true);
-          setTimeout(() => repliedMap.delete(replyKey), 10000);
+      const from = msg.key.remoteJid;
+      const isGroup = from.endsWith('@g.us');
+      const sender = isGroup ? msg.key.participant : from;
 
-          try {
-            await sock.sendMessage(from, {
-              text: 'hello 🤗',
-              mentions: [sender],
-            });
+      // Skip if group and message is from owner
+      if (isGroup && msg.key.fromMe) {
+        log('⚠️ Skipping group message from self');
+        continue;
+      }
 
-            if (sender === OWNER_JID) {
-              await sock.sendMessage(sender, {
-                text: '🧠 Owner detected. Message received.'
-              });
-            }
+      const textMsg = extractText(msg.message);
+      log(`📨 ${from} | ${textMsg} | isGroup: ${isGroup}`);
 
-            log(`✅ Replied to ${sender}`);
-          } catch (e) {
-            log('❌ Send error:', e);
+      if (textMsg?.trim().toLowerCase() === 'hi') {
+        const replyKey = `${from}|${msg.messageTimestamp}`;
+        if (repliedMap.has(replyKey)) return;
+
+        repliedMap.set(replyKey, true);
+        setTimeout(() => repliedMap.delete(replyKey), 15_000);
+
+        try {
+          await sock.sendMessage(from, {
+            text: `hello 🤗😒😒😒`,
+            mentions: [sender],
+          });
+
+          if (sender === OWNER_JID) {
+            await sock.sendMessage(sender, { text: `🧠 Bot received your "hi" message and replied.` });
           }
+
+          log(`✅ Replied to ${sender}`);
+        } catch (err) {
+          log('❌ Failed to reply:', err);
         }
       }
     }
   });
+
+  // Optional: force messages to load faster
+  sock.ev.on('message-receipt.update', (m) => {
+    try {
+      if (m?.key?.remoteJid) sock.readMessages([m.key]);
+    } catch (e) {
+      log('⚠️ Error reading message:', e.message);
+    }
+  });
 }
 
-startBot(SESSION_ID).catch(err => log('❌ Startup error:', err));
+// === START EVERYTHING ===
+startBot(SESSION_ID).catch(err => {
+  log('❌ Bot start failed:', err);
+});
 
-app.get('/', (_, res) => res.send('🤖 Bot running'));
-app.listen(PORT, () => log(`🌐 Web server running on port ${PORT}`));
+// === RENDER / REPLIT WEB SERVER ===
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.get('/', (_, res) => res.send('🤖 Bot is running.'));
+app.listen(PORT, () => {
+  log(`🌐 Web server running on port ${PORT}`);
+});
