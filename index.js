@@ -3,6 +3,7 @@ const path = require('path');
 const { default: makeWASocket, useMultiFileAuthState, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const { MongoClient } = require('mongodb');
+const express = require('express');
 
 // === CONFIG ===
 const SESSION_ID = 'mekaai_43cdf18f';
@@ -71,9 +72,11 @@ async function startBot(id) {
     browser: ['Ubuntu', 'Chrome', 'meka'],
     logger: pino({ level: 'fatal' }),
     ignoreBroadcast: true,
-    syncFullHistory: false, // ✅ you want speed — no old msg sync
-    shouldIgnoreJid: (jid) => false, // ✅ force read from all JIDs
-    getMessage: async () => undefined // ✅ avoid fallback errors
+    syncFullHistory: false,
+    shouldIgnoreJid: (jid) => false,
+    getMessage: async () => undefined,
+
+    syncOwn: true, // 👈🏽 ADD THIS LINE 👑
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -138,4 +141,13 @@ async function startBot(id) {
 // === RUN ===
 startBot(SESSION_ID).catch(err => {
   log('❌ Bot failed to start:', err);
+});
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (_, res) => res.send('🤖 Bot is running.'));
+
+app.listen(PORT, () => {
+  log(`🌐 HTTP server running on port ${PORT}`);
 });
