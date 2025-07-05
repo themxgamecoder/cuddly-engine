@@ -1,14 +1,29 @@
 {
   "name": "mekaai",
   "version": "1.0.0",
-  "description": "",
+  "description": "MekaAI - A powerful WhatsApp bot built with Whiskey Socket and Node.js",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"No tests yet\""
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "whatsapp-bot",
+    "meka",
+    "mekaai",
+    "ai",
+    "whiskeysocket",
+    "baileys",
+    "nodejs",
+    "express",
+    "mxgamecoder",
+    "themxgamecoder"
+  ],
+  "author": "themxgamecoder",
+  "license": "MIT",
   "dependencies": {
     "@types/node": "^22.13.11",
     "@whiskeysockets/baileys": "^6.7.18",
@@ -20,5 +35,19 @@
     "jimp": "^0.16.13",
     "mongodb": "^6.17.0",
     "pino": "^9.7.0"
-  }
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/themxgamecoder/cuddly-engine"
+  },
+  "bugs": {
+    "url": "https://github.com/themxgamecoder/cuddly-engine/issues"
+  },
+  "homepage": "https://github.com/themxgamecoder/cuddly-engine#readme"
 }
