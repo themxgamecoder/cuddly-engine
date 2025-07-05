@@ -29,7 +29,7 @@ require('dotenv').config();
 module.exports = {
   SESSION_ID: process.env.SESSION_ID || '',
   OWNER_JID: process.env.OWNER_JID || '',
-  MEKAMODE: process.env.MEKAMODE || 'mekaai',
+  MEKAMODE: process.env.MEKAMODE || 'meka',
   MEKAAUTOREACT: process.env.MEKAAUTOREACT || 'none', // "owner" or "everyone" or "none"
   MEKAAUTOVIEWSTATUS: process.env.MEKAAUTOVIEWSTATUS || 'offview', // "onview" or "offview"
   MEKAAUTOREAD: process.env.MEKAAUTOREAD || 'none', // "read" or "none"
