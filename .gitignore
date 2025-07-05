@@ -1,0 +1,4 @@
+node_modules/
+.obfuscated/
+.DS_Store
+.env
